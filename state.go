@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flowkit/v2/output"
 	"github.com/onflow/flowkit/v2/project"
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 )
 
 // Overflow client is an interface with the most used v1 api methods for overflow
@@ -232,59 +231,14 @@ func (o *OverflowState) parseArguments(fileName string, code []byte, inputArgs m
 	program, must := cmd.PrepareProgram(code, location, codes)
 	checker, _ := cmd.PrepareChecker(program, location, codes, nil, nil, must)
 
-	var parameterList []*ast.Parameter
-
-	functionDeclaration := sema.FunctionEntryPointDeclaration(program)
-	if functionDeclaration != nil {
-		if functionDeclaration.ParameterList != nil {
-			parameterList = functionDeclaration.ParameterList.Parameters
-		}
-	}
-
-	transactionDeclaration := program.TransactionDeclarations()
-	if len(transactionDeclaration) == 1 {
-		if transactionDeclaration[0].ParameterList != nil {
-			parameterList = transactionDeclaration[0].ParameterList.Parameters
-		}
-	}
-
+	parameterList := getParameterList(program)
 	if parameterList == nil {
 		return resultArgs, resultArgsMap, nil
 	}
-	argumentNotPresent := []string{}
-	argumentNames := []string{}
-	args := OverflowArgumentList{}
-	for _, parameter := range parameterList {
-		parameterName := parameter.Identifier.Identifier
-		value, ok := inputArgs[parameterName]
-		if !ok {
-			argumentNotPresent = append(argumentNotPresent, parameterName)
-		} else {
-			argumentNames = append(argumentNames, parameterName)
-			args = append(args, OverflowArgument{
-				Name:  parameterName,
-				Value: value,
-				Type:  parameter.TypeAnnotation.Type,
-			})
-		}
-	}
 
-	if len(argumentNotPresent) > 0 {
-		err := fmt.Errorf("the interaction '%s' is missing %v", fileName, argumentNotPresent)
-		return nil, nil, err
-	}
-
-	redundantArgument := []string{}
-	for inputKey := range inputArgs {
-		// If your IDE complains about this it is wrong, this is 1.18 generics not suported anywhere
-		if !slices.Contains(argumentNames, inputKey) {
-			redundantArgument = append(redundantArgument, inputKey)
-		}
-	}
-
-	if len(redundantArgument) > 0 {
-		err := fmt.Errorf("the interaction '%s' has the following extra arguments %v", fileName, redundantArgument)
-		return nil, nil, err
+	args, err := prepareOverflowArgument(parameterList, inputArgs)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "fileName %s", fileName)
 	}
 
 	for _, oa := range args {
@@ -301,8 +255,6 @@ func (o *OverflowState) parseArguments(fileName string, code []byte, inputArgs m
 
 		var argumentString string
 		switch a := argument.(type) {
-		case nil:
-			argumentString = "nil"
 		case string:
 			argumentString = a
 		case int:

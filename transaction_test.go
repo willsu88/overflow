@@ -30,12 +30,12 @@ func TestTransaction(t *testing.T) {
 
 	t.Run("error on missing argument", func(t *testing.T) {
 		res := o.Tx("arguments", WithSignerServiceAccount())
-		assert.ErrorContains(t, res.Err, "the interaction 'arguments' is missing [test]")
+		assert.ErrorContains(t, res.Err, "fileName arguments: the interaction is missing [test]")
 	})
 
 	t.Run("error on redundant argument", func(t *testing.T) {
 		res := o.Tx("arguments", WithArg("test2", "foo"), WithArg("test", "foo"), WithSignerServiceAccount())
-		assert.ErrorContains(t, res.Err, "the interaction 'arguments' has the following extra arguments [test2]")
+		assert.ErrorContains(t, res.Err, "fileName arguments: the interaction has the following extra arguments [test2]")
 	})
 
 	t.Run("Run simple tx with sa proposer", func(t *testing.T) {
